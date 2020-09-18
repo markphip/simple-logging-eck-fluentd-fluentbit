@@ -18,14 +18,6 @@ else
 fi
 # --------------------------------------------------------------------
 
-# -------------------------- deployment menu -------------------------
-logForwarder=1
-read -p  "Which log forwarder do you want to use
-1: Fluentbit
-2: Fluentd
-(default:1) promt with [ENTER]:" inputLogForwarder
-logForwarder="${inputLogForwarder:-$logForwarder}"
-
 diskSpace=2
 read -p  "How many gigabyte diskspace do you want per node?(default:2) promt with [ENTER]:" inputDiskSpace
 diskSpace="${inputDiskSpace:-$diskSpace}"
@@ -90,24 +82,12 @@ spec:
     name: quickstart
 EOF
 
-if [ $logForwarder -eq 1 ]; then
-  echo -e "[${LB}Info${NC}] deploy fluentd"
-  kubectl apply -f fluentbit/fluent-bit-configmap.yaml 
-  kubectl apply -f fluentbit/fluent-bit-service-account.yaml 
-  kubectl apply -f fluentbit/fluent-bit-role.yaml
-  # rolebinding is tied to the namespace "elastic-system"
-  kubectl apply -f fluentbit/fluent-bit-role-binding.yaml 
-  kubectl apply -f fluentbit/fluent-bit-ds.yaml 
+echo -e "[${LB}Info${NC}] deploy fluentd"
+kubectl apply -f fluentd/fluentd-cm.yaml 
+kubectl apply -f fluentd/fluentd-daemonset.yaml 
 
-  kubectl rollout status daemonset.apps/fluent-bit
+kubectl rollout status daemonset.apps/fluentd
 
-elif [ $logForwarder -eq 2 ]; then
-  echo -e "[${LB}Info${NC}] deploy fluentd"
-  kubectl apply -f fluentd/fluentd-cm.yaml 
-  kubectl apply -f fluentd/fluentd-daemonset.yaml 
-
-  kubectl rollout status daemonset.apps/fluentd
-fi
 # --------------------------------------------------------------------
 
 
@@ -119,61 +99,6 @@ echo -e "[${LB}Info${NC}] here are your kibana credentials. User is ${LB}elastic
 echo -e "[${LB}Info${NC}] waiting for deployment of kibana and elasticsearch (takes a cuple of minutes)"
 kubectl rollout status deployment/quickstart-kb
 
+echo -e "Starting port foward for Kibana. Access at http://localhost:5601 press Ctrl-C when done"
 kubectl port-forward service/quickstart-kb-http 5601
-# --------------------------------------------------------------------
-
-# --------------------- elastic retension config----------------------
-echo -e 'Define log retentionlifetimes with the ilm function
-Use the buildin dev console for execution
-
-PUT _ilm/policy/baremetal-ilm
-{
-  "policy": {
-    "phases": {
-      "hot": {
-        "min_age": "0ms",
-        "actions": {
-          "rollover": {
-            "max_age": "7d",
-            "max_size": "4gb"
-          },
-          "set_priority": {
-            "priority": 100
-          }
-        }
-      },
-      "delete": {
-        "min_age": "1d",
-        "actions": {
-          "delete": {
-            "delete_searchable_snapshot": true
-          }
-        }
-      }
-    }
-  }
-}
-
-PUT _index_template/baremetal-template
-{
-  "index_patterns": ["baremetal-*"], 
-  "template": {
-    "settings": {
-      "number_of_shards": 1,
-      "number_of_replicas": 1,
-      "index.lifecycle.name": "baremetal-ilm", 
-      "index.lifecycle.rollover_alias": "baremetal-rollover" 
-    }
-  }
-}
-
-PUT baremetal*/_settings 
-{
-  "index": {
-    "lifecycle": {
-      "name": "baremetal-ilm"
-    }
-  }
-}
-'
 # --------------------------------------------------------------------
