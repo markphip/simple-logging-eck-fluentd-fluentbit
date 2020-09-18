@@ -78,7 +78,7 @@ spec:
             value: "9200"
           # der elastic operator ist https standard
           - name: FLUENT_ELASTICSEARCH_SCHEME
-            value: "https"
+            value: "http"
           # dont need systemd logs for now
           - name: FLUENTD_SYSTEMD_CONF
             value: disable
