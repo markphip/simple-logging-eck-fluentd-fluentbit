@@ -59,9 +59,10 @@ spec:
         effect: NoSchedule
       containers:
       - name: fluentd
-        # stand 10.08.2020
-        image: fluent/fluentd-kubernetes-daemonset:v1.11.2-debian-elasticsearch7-1.0
+        image: quay.io/fluentd_elasticsearch/fluentd:v3.0.2
         env:
+          - name: FLUENTD_ARGS
+            value: --no-supervisor -q
           - name:  FLUENT_ELASTICSEARCH_HOST
             value: quickstart-es-http
           # default user
@@ -103,8 +104,22 @@ spec:
         - name: varlibdockercontainers
           mountPath: /var/lib/docker/containers
           readOnly: true
-        - name: fluentd-config-vol
-          mountPath: /fluentd/etc
+        - name: config-volume
+          mountPath: /etc/fluent/config.d
+        ports:
+        - containerPort: 24231
+          name: prometheus
+          protocol: TCP
+        livenessProbe:
+          tcpSocket:
+            port: prometheus
+          initialDelaySeconds: 5
+          timeoutSeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: prometheus
+          initialDelaySeconds: 5
+          timeoutSeconds: 10
       terminationGracePeriodSeconds: 30
       volumes:
       - name: varlog
@@ -113,7 +128,6 @@ spec:
       - name: varlibdockercontainers
         hostPath:
           path: /var/lib/docker/containers
-      - name: fluentd-config-vol
+      - name: config-volume
         configMap:
-          # holds the different fluendt configuration files
           name: fluentd-config
